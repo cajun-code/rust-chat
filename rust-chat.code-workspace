@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "chat-lib"
+		},
+		{
+			"path": "frontend"
+		},
+		{
+			"path": "backend"
+		}
+	],
+	"settings": {}
+}
