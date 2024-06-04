@@ -1,0 +1,8 @@
+
+
+[workspace]
+members = [
+    "chat-lib", 
+    "backend", 
+    "frontend",
+    ]
