@@ -2,6 +2,7 @@ use std::{collections::HashMap, sync::atomic::{AtomicUsize, Ordering}};
 
 use rocket::{futures::{stream::SplitSink, SinkExt, StreamExt}, tokio::sync::Mutex, State};
 use rocket_ws::{stream::DuplexStream, Channel, Message, WebSocket};
+use chat_lib::ChatMessage;
 
 #[macro_use] extern crate rocket;
 
@@ -23,10 +24,17 @@ impl ChatRoom{
             conns.remove(&id);
     }
 
-    pub async fn broadcast(&self, msg: Message){
+    pub async fn broadcast(&self, message: Message, author_id: usize){
+        let chat_msg = ChatMessage{
+            message: message.to_string(),
+            author: format!("User #{}", author_id),
+            created_at: chrono::Utc::now().naive_utc(),
+        };
+
+        let msg = serde_json::to_string(&chat_msg).unwrap();
         let mut conns = self.connections.lock().await; 
         for (_id, sink) in conns.iter_mut() {
-            let _ = sink.send(msg.clone()).await;
+            let _ = sink.send(Message::Text(msg.clone())).await;
         }
     }
 
@@ -41,7 +49,7 @@ fn chat<'r>(ws:WebSocket, room_state: &'r State<ChatRoom>)-> Channel<'r>{
         room_state.add_user(user_id, sink).await;
 
         while let Some(message) = ws_stream.next().await {
-            room_state.broadcast(message?).await;
+            room_state.broadcast(message?, user_id).await;
         }
         room_state.remove_user(user_id).await;
         Ok(())

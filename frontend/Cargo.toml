@@ -4,3 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+web-sys = "0.3.69"
+yew = { version = "0.21.0", features = ["csr"] }
+yew-hooks = "0.3.2"
+serde = {workspace = true}
+serde_json = {workspace = true}
+chrono = {workspace = true}
+chat-lib = {path = "../chat-lib"}

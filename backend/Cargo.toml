@@ -6,3 +6,7 @@ edition = "2021"
 [dependencies]
 rocket = "0.5.1"
 rocket_ws = "0.1.1"
+serde = {workspace = true}
+serde_json = {workspace = true}
+chrono = {workspace = true}
+chat-lib = {path = "../chat-lib"}
