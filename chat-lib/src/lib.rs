@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub enum WebSocketMessageType {
     NewMessage,
     UserList,
+    UserNameChange,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -15,6 +16,8 @@ pub struct WebSocketMessage {
     pub message: Option<ChatMessage>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub users: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub username: Option<String>,
 }
 
 

@@ -400,6 +400,7 @@ version = "0.1.0"
 dependencies = [
  "chat-lib",
  "chrono",
+ "gloo-dialogs 0.2.0",
  "serde",
  "serde_json",
  "web-sys",

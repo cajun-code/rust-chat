@@ -38,9 +38,13 @@ impl ChatRoom{
     }
 
     pub async fn broadcast(&self, message: Message, author_id: usize){
+
+        let mut  conns = self.connections.lock().await; 
+        let user = conns.get(&author_id).expect("Invalid user id");
+        
         let chat_msg = ChatMessage{
             message: message.to_string(),
-            author: format!("User #{}", author_id),
+            author: user.name.clone(),
             created_at: chrono::Utc::now().naive_utc(),
         };
 
@@ -48,21 +52,42 @@ impl ChatRoom{
             message_type: WebSocketMessageType::NewMessage,
             message: Some(chat_msg),
             users: None,
+            username: None,
         };
 
         let msg = serde_json::to_string(&envlope).unwrap();
-        let mut conns = self.connections.lock().await; 
+        //let mut conns = self.connections.lock().await; 
         for (_id, user) in conns.iter_mut() {
             let _ = user.sink.send(Message::Text(msg.clone())).await;
         }
     }
-
-    pub async fn broadcast_user_list(&self){
+    pub async fn broadcast_username(&self, author_id: usize){
         let mut conns = self.connections.lock().await; 
+        let user = conns.get_mut(&author_id).expect("Invalid user id");
+        let envlope = WebSocketMessage{
+            message_type: WebSocketMessageType::UserNameChange,
+            message: None,
+            users: None,
+            username: Some(user.name.clone()),
+        };
+
+        let msg = serde_json::to_string(&envlope).unwrap();
+        let _ = user.sink.send(Message::Text(msg)).await;
+    }
+    pub async fn update_username(&self, author_id: usize, name: String){
+        let mut conns = self.connections.lock().await; 
+        let user = conns.get_mut(&author_id).expect("Invalid user id");
+        user.name = name;
+       
+    }
+    pub async fn broadcast_user_list(&self){
+            let mut conns = self.connections.lock().await; 
             let envlope = WebSocketMessage{
                 message_type: WebSocketMessageType::UserList,
                 message: None,
                 users: Some(conns.values().map(|k| k.name.clone()).collect()),
+                username: None,
+
             };
             let msg = serde_json::to_string(&envlope).unwrap();
             for (_id, user) in conns.iter_mut() {
@@ -80,9 +105,24 @@ fn chat<'r>(ws:WebSocket, room_state: &'r State<ChatRoom>)-> Channel<'r>{
         let(mut sink, mut ws_stream) = stream.split();
         room_state.add_user(user_id, sink).await;
         room_state.broadcast_user_list().await;
+        room_state.broadcast_username(user_id).await;
 
         while let Some(message) = ws_stream.next().await {
-            room_state.broadcast(message?, user_id).await;
+            let msg: WebSocketMessage = serde_json::from_str(&message?.into_text()?).unwrap();
+            match msg.message_type {
+                WebSocketMessageType::UserNameChange => {
+                    let name = msg.username.expect("Username is missing payload");
+                    room_state.update_username(user_id, name).await;
+                    room_state.broadcast_user_list().await;
+                    room_state.broadcast_username(user_id).await;
+                },
+                WebSocketMessageType::NewMessage => {
+                    let cm = msg.message.expect("Message is missing payload");
+                    room_state.broadcast(Message::Text(cm.message), user_id).await;
+                },
+                _ => {}
+            }
+            //room_state.broadcast(message?, user_id).await;
         }
         room_state.remove_user(user_id).await;
         room_state.broadcast_user_list().await;
