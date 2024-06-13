@@ -23,18 +23,48 @@ struct ChatRoom{
 
 impl ChatRoom{
     pub async fn add_user(&self, id: usize, sink: SplitSink<DuplexStream, Message>){
-        let mut conns = self.connections.lock().await; 
+        let username   = {
+            let mut conns = self.connections.lock().await; 
+            let name = format!("User #{}", id);
             let user = User{
                 id,
-                name: format!("User #{}", id),
+                name: name.clone(),
                 sink,
             };
             conns.insert(id, user);
+            name
+        };
+        self.broadcast_system_message(&format!("User {} joined", username)).await;
+        
     }
 
     pub async fn remove_user(&self, id: usize){
-        let mut conns = self.connections.lock().await; 
+        let name = {
+            let mut conns = self.connections.lock().await; 
+            let user = conns.get(&id).expect("Invalid user id");
+            let name = user.name.clone();
             conns.remove(&id);
+            name
+        };
+        self.broadcast_system_message(&format!("User {} left", name)).await;
+    }
+
+    pub async fn broadcast_system_message(&self, message: &str){
+        let envlope = WebSocketMessage{
+            message_type: WebSocketMessageType::NewMessage,
+            message: Some(ChatMessage{
+                message: message.to_string(),
+                author: "System".to_string(),
+                created_at: chrono::Utc::now().naive_utc(),
+            }),
+            users: None,
+            username: None,
+        };
+        let msg = serde_json::to_string(&envlope).unwrap();
+        let mut conns = self.connections.lock().await; 
+        for (_id, user) in conns.iter_mut() {
+            let _ = user.sink.send(Message::Text(msg.clone())).await;
+        }
     }
 
     pub async fn broadcast(&self, message: Message, author_id: usize){
@@ -75,10 +105,14 @@ impl ChatRoom{
         let _ = user.sink.send(Message::Text(msg)).await;
     }
     pub async fn update_username(&self, author_id: usize, name: String){
-        let mut conns = self.connections.lock().await; 
-        let user = conns.get_mut(&author_id).expect("Invalid user id");
-        user.name = name;
-       
+        let username   = {
+            let mut conns = self.connections.lock().await; 
+            let user = conns.get_mut(&author_id).expect("Invalid user id");
+            let old_name = user.name.clone();
+            user.name = name.clone();
+            old_name
+        };
+        self.broadcast_system_message(&format!("User {} changed their name to {}", username, name)).await;
     }
     pub async fn broadcast_user_list(&self){
             let mut conns = self.connections.lock().await; 

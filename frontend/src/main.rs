@@ -8,7 +8,7 @@ mod send_dialog;
 mod user_list;
 
 use message_list::MessageList;
-use send_dialog::{SendDialog, _SendDialogProps::on_username_change};
+use send_dialog::SendDialog;
 use user_list::UserList;
 
 #[function_component]
